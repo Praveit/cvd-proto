@@ -1,0 +1,167 @@
+1. System Architecture Diagram
+                        +---------------------------------------+
+                        |          User / Client (Web)          |
+                        +-------------------+-------------------+
+                                            | (HTTPS / WSS)
+                                            v
+                        +-------------------+-------------------+
+                        |      API Gateway / Reverse Proxy      |
+                        +-------------------+-------------------+
+                                            |
+                         +------------------+------------------+
+                         |                                     |
+                         v                                     v
+         +---------------+---------------+     +---------------+---------------+
+         |     Auth & User Service       |     |        Tracking Engine        |
+         +---------------+---------------+     +---------------+---------------+
+                         |                                     |
+                         v                                     v
+         +---------------+---------------+     +---------------+---------------+
+         |     Primary Database (SQL)    |     |      Message Queue (Redis)    |
+         |  [Users, Orgs, Brand Assets]  |     +---------------+---------------+
+         +-------------------------------+                     |
+                                                               v
+                                               +---------------+---------------+
+                                               |    Worker Pool (Node/Python)  |
+                                               +---------------+---------------+
+                                                               |
+                                            +------------------+------------------+
+                                            | (API Keys)                          | (Scraping/Proxies)
+                                            v                                     v
+                             +--------------+--------------+       +--------------+--------------+
+                             |    LLM APIs (OpenAI, etc.)  |       | Web LLMs (Perplexity/Gemini)|
+                             +-----------------------------+       +-----------------------------+
+2. Core Functional Modules
+A. Brand Profiler & Keyword Engine
+Purpose: Allows users to define their brand, products, competitors, and target search phrases.
+
+Data Models:
+
+Organization: Top-level container.
+
+BrandAsset: Logos, URLs, exact product names, and variations (e.g., "Slack", "Slack Technologies").
+
+SearchCluster: Groups of intent-based queries (e.g., "Best DevOps tools for enterprise").
+
+B. LLM Interrogation Engine (The Workers)
+API-Based Crawling: Periodically pings official APIs (OpenAI, Anthropic) using zero-temperature system prompts to ask standard user queries and extract the markdown responses.
+
+Web-Based Scraping: Deploys a headless browser cluster (Playwright/Puppeteer) routed through rotating residential proxies to input queries into non-API search engines (Perplexity, Gemini Web, Microsoft Copilot) and fetch the final generated UI text.
+
+C. NLP & Share of Voice (SOV) Parser
+Parsing Pipeline: Takes raw text responses from the LLMs and runs them through a lightweight named entity recognition (NER) model or a micro-LLM string parser.
+
+Metrics Calculated:
+
+Mention Presence (Binary): Was the brand mentioned? (Yes/No)
+
+Sentiment Score: Was the context positive, neutral, or negative?
+
+Rank/Position: Was the brand listed first, second, or buried at the bottom?
+
+Citation Source: Did the LLM cite the user's website, or a third-party review site (e.g., G2, Reddit)?
+
+3. Technology Stack Recommendation
+Component	Technology	Rationale
+Frontend	Next.js (React) + TailwindCSS	Fast SSR for SEO (if landing pages are included), rapid UI building with shadcn/ui components.
+Backend API	Node.js (TypeScript) or FastAPI	High concurrency handling for async queue polling. FastAPI is optimal if heavy internal NLP logic is added later.
+Database	PostgreSQL	Robust relational data handling for billing, users, orgs, and structured tracking metrics.
+Queue & Cache	Redis	Crucial for managing bulk background scraping jobs to prevent hitting LLM rate limits.
+Scraping Infrastructure	Playwright + ScrapingBee / Bright Data	Standard Puppeteer gets blocked instantly by Cloudflare on Perplexity/Google Gemini. High-quality proxies are mandatory.
+4. Minimum Viable Product (MVP) Database Schema
+SQL
+-- Core Organizations/Users
+CREATE TABLE organizations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Brand definitions to look for in LLM responses
+CREATE TABLE brand_keywords (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+    keyword_string VARCHAR(255) NOT NULL, -- e.g., "Linear", "Linear App"
+    is_competitor BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Target search phrases to track
+CREATE TABLE trackable_queries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+    query_text TEXT NOT NULL, -- e.g., "Best issue tracker for startups"
+    frequency_hours INT DEFAULT 24,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Raw and parsed results from LLM runs
+CREATE TABLE scan_results (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    query_id UUID REFERENCES trackable_queries(id) ON DELETE CASCADE,
+    engine_name VARCHAR(50) NOT NULL, -- 'chatgpt-4o', 'perplexity', 'gemini'
+    raw_response TEXT NOT NULL,
+    brand_mentioned BOOLEAN DEFAULT FALSE,
+    mention_rank INT, -- 1 if listed first, NULL if not mentioned
+    sentiment_score NUMERIC(3,2), -- -1.00 to +1.00
+    citations_found TEXT[], -- Array of URLs cited by the LLM
+    scanned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+5. The "Secret Sauce" Engine Flow (The Core Routine)
+The following pseudo-code outlines how a worker processes a single tracking query to determine Share of Voice:
+
+Python
+import openai
+from db import save_scan_result
+
+def process_geo_tracking_job(job):
+    query = job.query_text
+    target_brands = job.org_brands # List containing your brand + competitor names
+    engine = job.target_engine # e.g., "chatgpt-4o"
+    
+    # 1. Fetch raw response from LLM
+    if engine == "chatgpt-4o":
+        response = openai.ChatCompletion.create(
+            model="gpt-4o",
+            temperature=0.0, # Zero out creativity for benchmarking consistency
+            messages=[{"role": "user", "content": query}]
+        )
+        raw_text = response.choices[0].message.content
+    elif engine == "perplexity":
+        raw_text = headless_scrape_perplexity(query)
+        
+    # 2. Analyze the response using a strict micro-evaluator
+    eval_prompt = f"""
+    Analyze the following text and determine if any of these brands are mentioned: {target_brands}.
+    Return a JSON array of objects with keys: 'brand', 'mentioned' (true/false), 'rank' (integer order appearance), 'sentiment' (positive/neutral/negative).
+    
+    Text: {raw_text}
+    """
+    
+    analysis_raw = openai.ChatCompletion.create(model="gpt-4o-mini", response_format={"type": "json_object"}, messages=[{"role": "user", "content": eval_prompt}])
+    analysis_data = parse_json(analysis_raw.choices[0].message.content)
+    
+    # 3. Commit to database to update client dashboard
+    for result in analysis_data['brands']:
+        save_scan_result(
+            query_id=job.query_id,
+            engine_name=engine,
+            raw_response=raw_text,
+            brand_mentioned=result['mentioned'],
+            mention_rank=result['rank'],
+            sentiment_score=calculate_score(result['sentiment'])
+        )
+6. Monetization & Go-To-Market (GTM) Strategy
+Pricing Tiers
+Growth ($89/mo): Track up to 20 search queries across 3 LLMs (ChatGPT, Gemini, Perplexity), updated weekly. 1 User seat.
+
+Pro ($249/mo): Track up to 100 search queries across 5 LLMs, updated daily. Automated alerts when a competitor displaces you. 5 User seats.
+
+Enterprise ($799+/mo): Hourly tracking, API access, custom sentiment LLM fine-tuning, and algorithmic suggestions on what content to publish to win back lost LLM citations.
+
+Customer Acquisition Playbook (The Hook)
+The "Free Audit" Lead Magnet: Build a free tool on your landing page. A user types in their website URL. You run a real-time script that queries ChatGPT for: "What are the top 3 alternatives to [User's Website]?"
+
+Show them a blurred dashboard showing that they are losing out on Perplexity or ChatGPT recommendations to their top competitor.
+
+To see the full breakdown and track it dynamically, they must enter their work email and upgrade to a paid tier. Targeting Head of SEO or VP of Growth on LinkedIn with this hook will yield highly qualified B2B demos.

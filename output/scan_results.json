@@ -1,0 +1,36 @@
+{
+    "scan_results": {
+        "id": 10042,
+        "engine_name": "ChatGPT-4o (Simulated)",
+        "organization_id": 1,
+        "payload": {
+            "entity_extractions": {
+                "brand_entities": [
+                    {
+                        "id": "brand_0",
+                        "value": "Linear",
+                        "sentiment_score": 0.75,
+                        "mention_rank": 1
+                    },
+                    {
+                        "id": "brand_1",
+                        "value": "Jira",
+                        "sentiment_score": -0.75,
+                        "mention_rank": 2
+                    }
+                ],
+                "raw_text_citations": [
+                    {
+                        "url": "https://linear.app/blog"
+                    }
+                ]
+            },
+            "summary_metrics": {
+                "brand_mentioned": true,
+                "primary_brand_rank": 1,
+                "primary_brand_sentiment": 0.75,
+                "total_citations_found": 1
+            }
+        }
+    }
+}
