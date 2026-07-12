@@ -58,10 +58,18 @@ export default function PatientForm({ onResult }: { onResult: (result: RiskResul
         body: JSON.stringify(patient)
       })
       
+      if (!response.ok) {
+        const error = await response.json()
+        console.error('API error:', error)
+        throw new Error(error.error || 'Risk calculation failed')
+      }
+      
       const result = await response.json()
       onResult(result)
     } catch (error) {
       console.error('Error:', error)
+      // Clear results on error so NaN doesn't display
+      onResult(null)
     } finally {
       setLoading(false)
     }

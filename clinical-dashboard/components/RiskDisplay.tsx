@@ -18,7 +18,7 @@ interface RiskDisplayProps {
 const riskGradientId = 'riskGradient'
 
 export default function RiskDisplay({ result }: RiskDisplayProps) {
-  if (!result) {
+  if (!result || typeof result.immediateRisk !== 'number' || isNaN(result.immediateRisk)) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="text-center py-12">
