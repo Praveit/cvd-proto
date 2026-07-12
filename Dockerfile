@@ -40,8 +40,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Create required directories
 RUN mkdir -p /var/cache/nginx /var/run/nginx /var/log/nginx /var/log/supervisor /var/run/supervisor
 
+# Create www-data user for nginx (already exists in debian)
+# Ensure nginx can run
+
 # ============================================
-# Stage 3: Install Python Dependencies (global, not user)
+# Stage 3: Install Python Dependencies (global)
 # ============================================
 FROM python-base AS python-deps
 
@@ -74,6 +77,9 @@ COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Fix permissions
 RUN chown -R user:user /home/user/app /var/cache/nginx /var/run/nginx /var/log/nginx /var/log/supervisor /var/run/supervisor
+
+# Ensure nginx can write pid file
+RUN touch /var/run/nginx/nginx.pid && chown user:user /var/run/nginx/nginx.pid
 
 WORKDIR /home/user/app
 USER user
