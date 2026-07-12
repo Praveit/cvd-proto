@@ -21,14 +21,14 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'Cannot connect to risk service. FastAPI may not be running.' }, { status: 503 })
     }
 
-    console.log('[API] FastAPI response status:', response.status)
+    console.log('[API] FastAPI response status:', response.status, response.statusText)
     
     const text = await response.text()
     console.log('[API] FastAPI raw response:', text)
     
     if (!response.ok) {
       console.error('[API] FastAPI error:', text)
-      return NextResponse.json({ error: 'Risk calculation failed: ' + text }, { status: 500 })
+      return NextResponse.json({ error: 'Risk calculation failed: ' + (text || 'HTTP ' + response.status) }, { status: 500 })
     }
     
     if (!text) {
@@ -41,7 +41,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       result = JSON.parse(text)
     } catch (e) {
       console.error('[API] Failed to parse FastAPI response:', text)
-      return NextResponse.json({ error: 'Invalid response from risk service' }, { status: 500 })
+      return NextResponse.json({ error: 'Invalid response from risk service: ' + text }, { status: 500 })
     }
     
     return NextResponse.json(result)
