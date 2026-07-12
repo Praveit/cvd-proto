@@ -1,7 +1,7 @@
 'use client'
 
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart as AreaChartType } from 'recharts'
-import { AlertTriangle, AlertCircle, CheckCircle2, Heart } from 'lucide-react'
+import { AlertTriangle, AlertCircle, CheckCircle2, Heart, TrendingUp } from 'lucide-react'
 
 interface RiskResult {
   immediateRisk: number
