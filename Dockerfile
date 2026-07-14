@@ -63,6 +63,9 @@ FROM python-deps AS runtime
 # Ensure standard binary paths are available in PATH
 ENV PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH}"
 
+# Verify nginx is installed in final image
+RUN which nginx && nginx -v
+
 # Create non-root user
 RUN useradd -m -u 1000 user
 
