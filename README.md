@@ -13,42 +13,42 @@ license: mit
 
 Explainable AI-powered cardiovascular disease risk prediction with SHAP feature importance explanations.
 
+## Live Demo
+
+**Live URL:** https://clinical-dashboard-woad.vercel.app/
+
+Try entering patient data to see:
+- 10-year CVD risk prediction
+- 2-year, 5-year, and 10-year risk horizons
+- SHAP feature importance showing what drives each prediction
+
 ## Features
 
 - **Clinical Risk Calculation**: 10-year CVD risk based on Framingham-style scoring
 - **SHAP Explanations**: Feature importance visualization showing what drives each prediction
 - **Multi-horizon Predictions**: Immediate, 2-year, 5-year, and 10-year risk estimates
-- **Real-time API**: FastAPI backend with sub-100ms response times
+- **Real-time API**: Next.js API route with sub-100ms response times
 
 ## Architecture
 
+The application now runs entirely on Vercel's serverless platform - no separate backend needed.
+
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    HF Space (Port 7860)                 │
-│  ┌──────────────┐    ┌──────────────┐    ┌────────────┐ │
-│  │    nginx     │───▶│   FastAPI    │    │  Next.js   │ │
-│  │  (reverse    │    │  (port 8000) │    │  (port     │ │
-│  │   proxy)     │    │              │    │   3000)    │ │
-│  └──────────────┘    └──────────────┘    └────────────┘ │
-│         ▲                    ▲                  ▲       │
-│         │                    │                  │       │
-│         └────────────────────┴──────────────────┘       │
-│                            │                             │
-│                     ┌──────────────┐                     │
-│                     │  supervisord │                     │
-│                     │  (process    │                     │
-│                     │   manager)   │                     │
-│                     └──────────────┘                     │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    Vercel (Serverless)                     │
+│  ┌──────────────┐    ┌──────────────────────────────────┐  │
+│  │  Next.js UI   │    │  /api/risk (Serverless Function) │  │
+│  │  (Frontend)  │───▶│  (TypeScript Risk Calculation)   │  │
+│  └──────────────┘    └──────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ## API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/health` | GET | Health check |
+| `/` | GET | Dashboard UI |
 | `/api/risk` | POST | Calculate CVD risk with SHAP values |
-| `/docs` | GET | FastAPI auto-generated docs |
 
 ### POST /api/risk
 
@@ -77,14 +77,68 @@ Explainable AI-powered cardiovascular disease risk prediction with SHAP feature 
   "risk5Year": 0.215,
   "risk10Year": 0.307,
   "shapImportance": [
-    {"feature": "age", "value": 0.047},
-    {"feature": "smoke", "value": 0.039},
-    {"feature": "ap_hi", "value": 0.031},
-    {"feature": "cholesterol", "value": 0.016},
-    {"feature": "active", "value": 0.016},
-    {"feature": "weight", "value": 0.008}
+    {"feature": "smoke", "value": 0.078},
+    {"feature": "age", "value": 0.063},
+    {"feature": "ap_hi", "value": 0.063},
+    {"feature": "cholesterol", "value": 0.031}
   ]
 }
+```
+
+## Host on Vercel (Recommended)
+
+The easiest way to deploy - free hobby tier available.
+
+### Option 1: Deploy from GitHub (Recommended)
+
+1. Push your code to GitHub
+2. Go to [vercel.com](https://vercel.com) and sign up with GitHub
+3. Click "Add New..." → "Project"
+4. Select the `clinical-dashboard` repository
+5. Click "Deploy"
+
+Your app will be live at `https://your-project.vercel.app`
+
+### Option 2: Deploy from CLI
+
+```bash
+# Install Vercel CLI
+npm install -g vercel
+
+# Login or sign up
+vercel login
+
+# Deploy
+vercel --prod
+```
+
+## Host Locally
+
+### Prerequisites
+- Node.js 18+
+- npm or yarn
+
+### Steps
+
+```bash
+# Clone the repository
+git clone https://github.com/Praveit/cvd-risk-dashboard.git
+cd cvd-risk-dashboard/clinical-dashboard
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+Open http://localhost:3000 to see the dashboard.
+
+### Build for Production
+
+```bash
+npm run build
+npm start
 ```
 
 ## Model Details
@@ -92,30 +146,14 @@ Explainable AI-powered cardiovascular disease risk prediction with SHAP feature 
 - **Risk Algorithm**: Clinical point-based scoring (Framingham-inspired)
 - **Features**: 11 clinical variables (age, gender, BP, cholesterol, glucose, BMI, lifestyle)
 - **SHAP Approximation**: Proportional contribution scaling from clinical points
-- **Performance**: ~50ms per prediction on CPU
+- **Performance**: ~50ms per prediction on serverless
 
-## Deployment
+## Technology Stack
 
-This Space runs on Hugging Face Spaces using Docker SDK:
-- **Base**: `python:3.11-slim` (~200MB base)
-- **Runtime**: ~800MB total (Python deps + Node.js + nginx + supervisord)
-- **Port**: 7860 (HF Spaces standard)
-- **Processes**: nginx + FastAPI (uvicorn) + Next.js (standalone) managed by supervisord
-
-## Local Development
-
-```bash
-# Build and run locally
-docker build -t cvd-risk .
-docker run -p 7860:7860 cvd-risk
-
-# Or run services separately
-# Terminal 1: FastAPI
-cd api && uvicorn main:app --host 0.0.0.0 --port 8000
-
-# Terminal 2: Next.js
-cd clinical-dashboard && npm run dev
-```
+- **Frontend**: Next.js 16, React, Tailwind CSS, Recharts
+- **API**: Next.js Serverless Functions (TypeScript)
+- **Hosting**: Vercel (free hobby tier)
+- **Risk Calculation**: Native TypeScript port of clinical algorithms
 
 ## License
 
