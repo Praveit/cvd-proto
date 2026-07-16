@@ -120,7 +120,7 @@ export default function DashboardPage() {
           <div>
             {riskResult ? (
               <>
-                <RiskDisplay result={riskResult} patientData={patientData} />
+                <RiskDisplay result={riskResult} />
                 <ExplanationPanel shapImportance={riskResult.shapImportance} />
               </>
             ) : (
