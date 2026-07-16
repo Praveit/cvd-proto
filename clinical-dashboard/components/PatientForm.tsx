@@ -52,9 +52,26 @@ export default function PatientForm({ onResult }: { onResult: (result: RiskResul
     setLoading(true)
     
     try {
+      // Get auth token from localStorage (set by Supabase)
+      const supabaseAuthToken = localStorage.getItem('sb-rthslvvxeazcfihckzvg-auth-token')
+      let authHeader = ''
+      if (supabaseAuthToken) {
+        try {
+          const tokenData = JSON.parse(supabaseAuthToken)
+          if (tokenData?.access_token) {
+            authHeader = `Bearer ${tokenData.access_token}`
+          }
+        } catch (e) {}
+      }
+
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (authHeader) {
+        headers['Authorization'] = authHeader
+      }
+
       const response = await fetch('/api/risk', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(patient)
       })
       
