@@ -39,7 +39,7 @@ const initialPatient: PatientData = {
   active: 1
 }
 
-export default function PatientForm({ onResult }: { onResult: (result: RiskResult | null) => void }) {
+export default function PatientForm({ onResult }: { onResult: (result: RiskResult | null, data?: PatientData) => void }) {
   const [patient, setPatient] = useState<PatientData>(initialPatient)
   const [loading, setLoading] = useState(false)
 
@@ -65,7 +65,7 @@ export default function PatientForm({ onResult }: { onResult: (result: RiskResul
       }
       
       const result = await response.json()
-      onResult(result)
+      onResult(result, patient)
     } catch (error) {
       console.error('Error:', error)
       // Clear results on error so NaN doesn't display
