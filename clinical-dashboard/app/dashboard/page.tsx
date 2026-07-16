@@ -43,9 +43,11 @@ export default function DashboardPage() {
     if (data) setHistory(data)
   }
 
-  const handleResult = (result: RiskResult, data: any) => {
-    setRiskResult(result)
-    setPatientData(data)
+  const handleResult = (result: RiskResult | null, data?: any) => {
+    if (result) {
+      setRiskResult(result)
+      setPatientData(data)
+    }
   }
 
   const handleSaveToHistory = async () => {
